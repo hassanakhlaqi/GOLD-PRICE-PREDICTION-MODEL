@@ -1,0 +1,61 @@
+version: '3.9'
+
+services:
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gold-price-streamlit
+    ports:
+      - "8501:8501"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./Data:/app/Data
+      - ./Models:/app/Models
+      - ./logs:/app/logs
+    command: python3 -m streamlit run Src/app_improved.py --server.port=8501 --server.address=0.0.0.0
+    networks:
+      - gold-price-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gold-price-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./Data:/app/Data
+      - ./Models:/app/Models
+      - ./logs:/app/logs
+    command: python3 -m uvicorn Src.api.main:app --host 0.0.0.0 --port 8000 --workers 4
+    networks:
+      - gold-price-network
+    restart: unless-stopped
+    depends_on:
+      - streamlit
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  gold-price-network:
+    driver: bridge
+
+volumes:
+  data:
+  models:
+  logs:
